@@ -13,7 +13,7 @@
 
 
 from util import manhattanDistance
-from game import Directions
+from game import Directions, Actions
 import random, util
 
 from game import Agent
@@ -74,7 +74,24 @@ class ReflexAgent(Agent):
         newScaredTimes = [ghostState.scaredTimer for ghostState in newGhostStates]
 
         "*** YOUR CODE HERE ***"
-        return successorGameState.getScore()
+        foodList = newFood.asList()
+        ghostDist = [manhattanDistance(newPos, gs) for gs in successorGameState.getGhostPositions()]
+
+        if currentGameState.getPacmanPosition()==newPos:
+            return -10000
+
+        for gd in ghostDist:
+            if gd <= 1:
+                return -10000
+
+
+        distList = [manhattanDistance(newPos, food) for food in foodList]
+        distList = sorted(distList)
+
+        if (len(distList)==0):
+            return 10000
+
+        return (1/sum(distList) + 10/len(distList))
 
 def scoreEvaluationFunction(currentGameState):
     """
@@ -129,7 +146,49 @@ class MinimaxAgent(MultiAgentSearchAgent):
             Returns the total number of agents in the game
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        depth = self.depth
+        a = self.value(gameState, 0, depth)
+        return a[1]
+
+    def value(self, gamestate, agentIndex,depth):
+        if depth==0:
+            return (self.evaluationFunction(gamestate),'STOP')
+        if agentIndex==0:
+            return self.max_value(gamestate, 0, depth)
+        else:
+            return self.min_value(gamestate, agentIndex, depth)
+
+
+    def max_value(self, gamestate,agentIndex, depth):
+        v =(-float("inf"),'START')
+        next_legal_move = gamestate.getLegalActions(agentIndex)
+        for move in next_legal_move:
+            succ_state = gamestate.generateSuccessor(agentIndex, move)
+            #for i in range(1, gamestate.getNumAgents()):
+            val = (self.value(succ_state, (agentIndex+1)%gamestate.getNumAgents(), depth)[0], move)
+                #if val[0] == -float("inf"):
+                #    val = (self.evaluationFunction(gamestate), move)
+            v = max(v, val, key = lambda x : x[0])
+        if next_legal_move==[]:
+            v = (self.evaluationFunction(gamestate),'STOP')
+        return v
+
+
+    def min_value(self, gamestate, agentIndex, depth):
+        v = (float("inf"),'START')
+        next_legal_move = gamestate.getLegalActions(agentIndex)
+        if agentIndex == gamestate.getNumAgents()-1:
+            depth -= 1
+        for move in next_legal_move:
+            succ_state = gamestate.generateSuccessor(agentIndex, move)
+            val = (self.value(succ_state,(agentIndex+1)%gamestate.getNumAgents(), depth)[0], move)
+            #if val[0] == float("inf"):
+            #   val = (self.evaluationFunction(gamestate), move)
+            v = min(v,val , key=lambda x : x[0])
+        if next_legal_move == []:
+            v = (self.evaluationFunction(gamestate),'STOP')
+        return v
+
 
 class AlphaBetaAgent(MultiAgentSearchAgent):
     """
@@ -141,7 +200,51 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
           Returns the minimax action using self.depth and self.evaluationFunction
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        depth = self.depth
+        a = self.value(gameState, 0, depth, -float("inf"), float("inf"))
+        return a[1]
+
+    # alpha - max's best option on path to root
+    # beta - min's best option on path to root
+    def value(self, gamestate, agentIndex, depth, alpha, beta):
+        if depth == 0:
+            return (self.evaluationFunction(gamestate), 'STOP')
+        if agentIndex == 0:
+            return self.max_value(gamestate, 0, depth, alpha, beta)
+        else:
+            return self.min_value(gamestate, agentIndex, depth, alpha, beta)
+
+    def max_value(self, gamestate, agentIndex, depth, alpha, beta):
+        v = (-float("inf"), 'START')
+        next_legal_move = gamestate.getLegalActions(agentIndex)
+        for move in next_legal_move:
+            succ_state = gamestate.generateSuccessor(agentIndex, move)
+            val = (self.value(succ_state, (agentIndex + 1) % gamestate.getNumAgents(), depth, alpha, beta)[0], move)
+            v = max(v, val, key=lambda x: x[0])
+            if v[0] > beta:
+                break
+            alpha = max(alpha, v[0])
+        if next_legal_move == []:
+            v = (self.evaluationFunction(gamestate), 'STOP')
+        return v
+
+    def min_value(self, gamestate, agentIndex, depth,alpha, beta):
+        v = (float("inf"), 'START')
+        next_legal_move = gamestate.getLegalActions(agentIndex)
+        if agentIndex == gamestate.getNumAgents() - 1:
+            depth -= 1
+        for move in next_legal_move:
+            succ_state = gamestate.generateSuccessor(agentIndex, move)
+            val = (self.value(succ_state, (agentIndex + 1) % gamestate.getNumAgents(), depth, alpha, beta)[0], move)
+            # if val[0] == float("inf"):
+            #   val = (self.evaluationFunction(gamestate), move)
+            v = min(v, val, key=lambda x: x[0])
+            if v[0] < alpha:
+                break
+            beta = min(beta, v[0])
+        if next_legal_move == []:
+            v = (self.evaluationFunction(gamestate), 'STOP')
+        return v
 
 class ExpectimaxAgent(MultiAgentSearchAgent):
     """
@@ -156,7 +259,47 @@ class ExpectimaxAgent(MultiAgentSearchAgent):
           legal moves.
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        depth = self.depth
+        a = self.value(gameState, 0, depth)
+        return a[1]
+
+    def value(self, gamestate, agentIndex,depth):
+        if depth==0:
+            return (self.evaluationFunction(gamestate),'STOP')
+        if agentIndex==0:
+            return self.max_value(gamestate, 0, depth)
+        else:
+            return self.exp_value(gamestate, agentIndex, depth)
+
+
+    def max_value(self, gamestate,agentIndex, depth):
+        v =(-float("inf"),'START')
+        next_legal_move = gamestate.getLegalActions(agentIndex)
+        for move in next_legal_move:
+            succ_state = gamestate.generateSuccessor(agentIndex, move)
+            val = (self.value(succ_state, (agentIndex+1)%gamestate.getNumAgents(), depth)[0], move)
+            v = max(v, val, key = lambda x : x[0])
+        if next_legal_move==[]:
+            v = (self.evaluationFunction(gamestate),'STOP')
+        return v
+
+
+    def exp_value(self, gamestate, agentIndex, depth):
+        v = (float("inf"),'START')
+        next_legal_move = gamestate.getLegalActions(agentIndex)
+        if agentIndex == gamestate.getNumAgents()-1:
+            depth -= 1
+        exp = 0
+        for move in next_legal_move:
+            succ_state = gamestate.generateSuccessor(agentIndex, move)
+            val = (self.value(succ_state,(agentIndex+1)%gamestate.getNumAgents(), depth)[0], move)
+            exp += val[0]
+
+        if next_legal_move == []:
+            v = (self.evaluationFunction(gamestate),'STOP')
+        else:
+            v = ((float(exp) / len(next_legal_move)), 'XYZ')
+        return v
 
 def betterEvaluationFunction(currentGameState):
     """
